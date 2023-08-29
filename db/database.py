@@ -31,6 +31,12 @@ class FlightDatabase:
         ''', data)
         self.connection.commit()
 
+
+    def get_single_flight(self, launch_id):
+        query = "SELECT * FROM Flights WHERE LaunchID = ?"
+        self.cursor.execute(query, (launch_id,))
+        return self.cursor.fetchone()
+
     def get_flights(self, criteria=None, value=None):
         if criteria and value:
             query = f"SELECT * FROM Flights WHERE {criteria} = ?"
