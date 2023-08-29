@@ -1,78 +1,36 @@
-import sqlite3
-from utils.csv_parser import CSVParser  # Importing CSVParser for use in update_flight_recorder_data
+from db.database import FlightDatabase
+import random  # Import for generating Launch ID
 
-class FlightDatabase:
-    def __init__(self, db_name):
-        self.connection = sqlite3.connect(db_name)
-        self.cursor = self.connection.cursor()
-        self.create_table()
+def generate_launch_id():
+    return f"UKSA-{random.randint(1000, 9999)}"
 
-    def create_table(self):
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS Flights (
-                LaunchID TEXT PRIMARY KEY,
-                LVName TEXT,
-                Payload TEXT,
-                Phase TEXT,
-                Destination TEXT,
-                Manned BOOLEAN,
-                CurrentStatus TEXT,
-                FlightRecorderData TEXT,
-                Failures TEXT,
-                Comments TEXT
-            )
-        ''')
-        self.connection.commit()
+def main():
+    db = FlightDatabase('KSP_FlightManager.db')
+    
+    # Your backend logic here
+    # For example, you can call db.get_flights() to get a list of flights
+    # Or call db.insert_flight(data) to insert a new flight
 
-    def insert_flight(self, data):
-        self.cursor.execute('''
-            INSERT INTO Flights (LaunchID, LVName, Payload, Phase, Destination, Manned, CurrentStatus, FlightRecorderData, Failures, Comments)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', data)
-        self.connection.commit()
+    # Close the database connection when done
+    db.close()
 
+if __name__ == "__main__":
+    main()
+from db.database import FlightDatabase
+import random  # Import for generating Launch ID
 
-    def get_single_flight(self, launch_id):
-        query = "SELECT * FROM Flights WHERE LaunchID = ?"
-        self.cursor.execute(query, (launch_id,))
-        return self.cursor.fetchone()
+def generate_launch_id():
+    return f"UKSA-{random.randint(1000, 9999)}"
 
-    def get_flights(self, criteria=None, value=None):
-        if criteria and value:
-            query = f"SELECT * FROM Flights WHERE {criteria} = ?"
-            self.cursor.execute(query, (value,))
-        else:
-            query = "SELECT * FROM Flights"
-            self.cursor.execute(query)
-        return self.cursor.fetchall()
+def main():
+    db = FlightDatabase('KSP_FlightManager.db')
+    
+    # Your backend logic here
+    # For example, you can call db.get_flights() to get a list of flights
+    # Or call db.insert_flight(data) to insert a new flight
 
-    def update_flight(self, launch_id, updated_data=None, flight_recorder_data=None):
-        if flight_recorder_data:
-            query = '''
-            UPDATE Flights
-            SET FlightRecorderData = ?
-            WHERE LaunchID = ?
-            '''
-            self.cursor.execute(query, (flight_recorder_data, launch_id))
-        elif updated_data:
-            query = '''
-            UPDATE Flights
-            SET LVName = ?, Payload = ?, Phase = ?, Destination = ?, Manned = ?, CurrentStatus = ?, FlightRecorderData = ?, Failures = ?, Comments = ?
-            WHERE LaunchID = ?
-            '''
-            self.cursor.execute(query, (*updated_data, launch_id))
-            self.connection.commit()
+    # Close the database connection when done
+    db.close()
 
-    def delete_flight(self, launch_id):
-        query = "DELETE FROM Flights WHERE LaunchID = ?"
-        self.cursor.execute(query, (launch_id,))
-        self.connection.commit()
-
-    def update_flight_recorder_data(self, launch_id, file_path):
-        parser = CSVParser(file_path)
-        headers, data = parser.parse()
-        table_str = f"Headers: {headers}\nData: {data}"
-        self.update_flight(launch_id, flight_recorder_data=table_str)
-
-    def close(self):
-        self.connection.close()
+if __name__ == "__main__":
+    main()
