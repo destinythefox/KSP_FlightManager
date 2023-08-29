@@ -1,80 +1,78 @@
-from db.database import FlightDatabase
-# from frontend.gui_interface import RetroFlightManager  # Import RetroFlightManager
-# import tkinter as tk
-import curses
+import sqlite3
+from utils.csv_parser import CSVParser  # Importing CSVParser for use in update_flight_recorder_data
 
-def curses_main(stdscr):
-    db = FlightDatabase('KSP_FlightManager.db')
-    
-    curses.noecho()
-    curses.cbreak()
-    stdscr.keypad(True)
-    
-    menu_items = ["List Flights", "View Flight", "Exit"]
-    current_item = 0
-    
-    while True:
-        stdscr.clear()
-        stdscr.addstr(0, 0, "Retro Flight Manager")
-        
-        for i, item in enumerate(menu_items):
-            if i == current_item:
-                stdscr.addstr(i + 2, 0, item, curses.A_REVERSE)
-            else:
-                stdscr.addstr(i + 2, 0, item)
-        
-        key = stdscr.getch()
-        
-        if key == curses.KEY_UP and current_item > 0:
-            current_item -= 1
-        elif key == curses.KEY_DOWN and current_item < len(menu_items) - 1:
-            current_item += 1
-        elif key == 10:  # Enter key
-            if current_item == 0:
-                flights = db.get_flights()
-                stdscr.clear()
-                stdscr.addstr(0, 0, "Listing Flights:")
-                for i, flight in enumerate(flights):
-                    stdscr.addstr(i + 1, 0, str(flight))
-                stdscr.addstr(len(flights) + 2, 0, "Press any key to continue.")
-                stdscr.getch()
-            elif current_item == 1:
-                stdscr.clear()
-                stdscr.addstr(0, 0, "Enter Launch ID:")
-                curses.echo()
-                launch_id = stdscr.getstr().decode('utf-8')
-                curses.noecho()
-                flight = db.get_flights('LaunchID', launch_id)
-                stdscr.clear()
-                stdscr.addstr(0, 0, f"Details for Launch ID {launch_id}:")
-                stdscr.addstr(1, 0, str(flight))
-                stdscr.addstr(3, 0, "Press any key to continue.")
-                stdscr.getch()
-            elif current_item == 2:
-                break
+class FlightDatabase:
+    def __init__(self, db_name):
+        self.connection = sqlite3.connect(db_name)
+        self.cursor = self.connection.cursor()
+        self.create_table()
 
-    curses.nocbreak()
-    stdscr.keypad(False)
-    curses.echo()
-    curses.endwin()
+    def create_table(self):
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS Flights (
+                LaunchID TEXT PRIMARY KEY,
+                LVName TEXT,
+                Payload TEXT,
+                Phase TEXT,
+                Destination TEXT,
+                Manned BOOLEAN,
+                CurrentStatus TEXT,
+                FlightRecorderData TEXT,
+                Failures TEXT,
+                Comments TEXT
+            )
+        ''')
+        self.connection.commit()
 
-    # Close database connection
-    db.close()
+    def insert_flight(self, data):
+        self.cursor.execute('''
+            INSERT INTO Flights (LaunchID, LVName, Payload, Phase, Destination, Manned, CurrentStatus, FlightRecorderData, Failures, Comments)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', data)
+        self.connection.commit()
 
-def main():
-    # Initialize database connection
-    db = FlightDatabase('KSP_FlightManager.db')
-    
-    # Initialize GUI interface
-    # root = tk.Tk()
-    # interface = RetroFlightManager(root, db)  # Pass the database object to the GUI
-    
-    # Start the Tkinter event loop
-    # root.mainloop()
 
-    # Close database connection
-    db.close()
+    def get_single_flight(self, launch_id):
+        query = "SELECT * FROM Flights WHERE LaunchID = ?"
+        self.cursor.execute(query, (launch_id,))
+        return self.cursor.fetchone()
 
-if __name__ == "__main__":
-    # main()
-    curses.wrapper(curses_main)
+    def get_flights(self, criteria=None, value=None):
+        if criteria and value:
+            query = f"SELECT * FROM Flights WHERE {criteria} = ?"
+            self.cursor.execute(query, (value,))
+        else:
+            query = "SELECT * FROM Flights"
+            self.cursor.execute(query)
+        return self.cursor.fetchall()
+
+    def update_flight(self, launch_id, updated_data=None, flight_recorder_data=None):
+        if flight_recorder_data:
+            query = '''
+            UPDATE Flights
+            SET FlightRecorderData = ?
+            WHERE LaunchID = ?
+            '''
+            self.cursor.execute(query, (flight_recorder_data, launch_id))
+        elif updated_data:
+            query = '''
+            UPDATE Flights
+            SET LVName = ?, Payload = ?, Phase = ?, Destination = ?, Manned = ?, CurrentStatus = ?, FlightRecorderData = ?, Failures = ?, Comments = ?
+            WHERE LaunchID = ?
+            '''
+            self.cursor.execute(query, (*updated_data, launch_id))
+            self.connection.commit()
+
+    def delete_flight(self, launch_id):
+        query = "DELETE FROM Flights WHERE LaunchID = ?"
+        self.cursor.execute(query, (launch_id,))
+        self.connection.commit()
+
+    def update_flight_recorder_data(self, launch_id, file_path):
+        parser = CSVParser(file_path)
+        headers, data = parser.parse()
+        table_str = f"Headers: {headers}\nData: {data}"
+        self.update_flight(launch_id, flight_recorder_data=table_str)
+
+    def close(self):
+        self.connection.close()
