@@ -1,9 +1,18 @@
-import sqlite3
-from utils.csv_parser import CSVParser  # Importing CSVParser for use in update_flight_recorder_data
+import os
+import psycopg2
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class FlightDatabase:
-    def __init__(self, db_name):
-        self.connection = sqlite3.connect(db_name)
+    def __init__(self):
+        self.connection = psycopg2.connect(
+            dbname=os.getenv("DB_NAME"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
+            host=os.getenv("DB_HOST"),
+            port=os.getenv("DB_PORT")
+        )
         self.cursor = self.connection.cursor()
         self.create_table()
 
